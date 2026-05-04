@@ -4,6 +4,24 @@
   "description": "Paperclip plugin that connects a Paperclip instance to a Linear workspace — issue sync, comments, status mirroring, webhooks, and an agent tool.",
   "type": "module",
   "license": "MIT",
+  "author": "Fabian Oudhaarlem",
+  "homepage": "https://github.com/Oldharlem/paperclip-linear-plugin#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Oldharlem/paperclip-linear-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Oldharlem/paperclip-linear-plugin/issues"
+  },
+  "keywords": [
+    "paperclip",
+    "paperclipai",
+    "paperclip-plugin",
+    "linear",
+    "linear-app",
+    "issue-tracker",
+    "sync"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },
