@@ -1,5 +1,5 @@
 {
-  "name": "@paperclipai/plugin-linear",
+  "name": "@oldharlem/paperclip-plugin-linear",
   "version": "0.4.0",
   "description": "Paperclip plugin that connects a Paperclip instance to a Linear workspace — issue sync, comments, status mirroring, webhooks, and an agent tool.",
   "type": "module",

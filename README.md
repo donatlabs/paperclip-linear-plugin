@@ -1,4 +1,4 @@
-# @paperclipai/plugin-linear
+# @oldharlem/paperclip-plugin-linear
 
 Connects a Paperclip instance to a [Linear](https://linear.app) workspace.
 
