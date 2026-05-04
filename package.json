@@ -1,0 +1,47 @@
+{
+  "name": "@paperclipai/plugin-linear",
+  "version": "0.4.0",
+  "description": "Paperclip plugin that connects a Paperclip instance to a Linear workspace — issue sync, comments, status mirroring, webhooks, and an agent tool.",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "paperclipPlugin": {
+    "manifest": "./dist/manifest.js",
+    "worker": "./dist/worker.js",
+    "ui": "./dist/ui/"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc && node esbuild.config.mjs",
+    "build:tsc": "tsc",
+    "build:ui": "node esbuild.config.mjs",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --import=tsx tests/*.spec.ts"
+  },
+  "dependencies": {
+    "@paperclipai/plugin-sdk": "^2026.428.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "@types/react": "^19.0.8",
+    "esbuild": "^0.24.0",
+    "react": "^19.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.3"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
+}
