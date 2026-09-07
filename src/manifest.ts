@@ -30,8 +30,8 @@ const manifest: PaperclipPluginManifestV1 = {
   version: PLUGIN_VERSION,
   displayName: "Linear",
   description:
-    "Two-way sync between Paperclip projects and a Linear workspace. Pick which Paperclip project links to which Linear project; new Paperclip issues push to the linked Linear project, Linear issues that carry a configured label are imported back so agents can pick them up.",
-  author: "Paperclip",
+    "Two-way sync between Tandem projects and a Linear workspace. Pick which Tandem project links to which Linear project; new Tandem issues push to the linked Linear project, Linear issues that carry a configured label are imported back so agents can pick them up.",
+  author: "Numux Tech Ltd",
   categories: ["connector", "automation", "ui"],
   capabilities: [
     "companies.read",
@@ -74,7 +74,7 @@ const manifest: PaperclipPluginManifestV1 = {
         type: "string",
         title: "Linear API Key (secret ref)",
         description:
-          "Optional: reference an entry in the Paperclip secret provider instead of pasting the key above.",
+          "Optional: reference an entry in the workspace secret store instead of pasting the key above.",
         format: "secret-ref",
       },
       webhookSecret: {
@@ -94,19 +94,19 @@ const manifest: PaperclipPluginManifestV1 = {
       },
       pushPaperclipIssues: {
         type: "boolean",
-        title: "Push new Paperclip issues to Linear",
+        title: "Push new Tandem issues to Linear",
         default: DEFAULT_CONFIG.pushPaperclipIssues,
       },
       importLinearIssues: {
         type: "boolean",
-        title: "Import labelled Linear issues into Paperclip",
+        title: "Import labelled Linear issues into Tandem",
         default: DEFAULT_CONFIG.importLinearIssues,
       },
       importLabelName: {
         type: "string",
         title: "Import label",
         description:
-          "Linear label name that gates imports — only Linear issues with this label are pulled into Paperclip. The plugin auto-creates the label on first sync.",
+          "Linear label name that gates imports — only Linear issues with this label are pulled into Tandem. The plugin auto-creates the label on first sync.",
         default: DEFAULT_CONFIG.importLabelName,
       },
       incrementalSyncMinutes: {
@@ -147,7 +147,7 @@ const manifest: PaperclipPluginManifestV1 = {
       name: TOOL_NAMES.createLinearIssue,
       displayName: "Create Linear Issue",
       description:
-        "Creates a new issue in Linear. If the agent's current Paperclip project is linked to a Linear project, the issue is created there.",
+        "Creates a new issue in Linear. If the agent's current Tandem project is linked to a Linear project, the issue is created there.",
       parametersSchema: {
         type: "object",
         properties: {
@@ -156,12 +156,12 @@ const manifest: PaperclipPluginManifestV1 = {
           paperclipProjectId: {
             type: "string",
             description:
-              "Optional Paperclip project UUID. When provided, resolves the linked Linear project automatically.",
+              "Optional Tandem project UUID. When provided, resolves the linked Linear project automatically.",
           },
           paperclipIssueId: {
             type: "string",
             description:
-              "Optional Paperclip issue UUID. When provided, the resulting Linear issue is linked to it for future bidirectional sync.",
+              "Optional Tandem issue UUID. When provided, the resulting Linear issue is linked to it for future bidirectional sync.",
           },
           teamId: {
             type: "string",

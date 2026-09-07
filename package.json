@@ -1,17 +1,17 @@
 {
-  "name": "@oldharlem/paperclip-plugin-linear",
-  "version": "0.4.0",
-  "description": "Paperclip plugin that connects a Paperclip instance to a Linear workspace — issue sync, comments, status mirroring, webhooks, and an agent tool.",
+  "name": "@donatlabs/paperclip-plugin-linear",
+  "version": "0.5.0",
+  "description": "Paperclip plugin that connects a Paperclip instance to a Linear workspace \u2014 issue sync, comments, status mirroring, webhooks, and an agent tool.",
   "type": "module",
   "license": "MIT",
   "author": "Fabian Oudhaarlem",
-  "homepage": "https://github.com/Oldharlem/paperclip-linear-plugin#readme",
+  "homepage": "https://github.com/donatlabs/paperclip-linear-plugin#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Oldharlem/paperclip-linear-plugin.git"
+    "url": "git+https://github.com/donatlabs/paperclip-linear-plugin.git"
   },
   "bugs": {
-    "url": "https://github.com/Oldharlem/paperclip-linear-plugin/issues"
+    "url": "https://github.com/donatlabs/paperclip-linear-plugin/issues"
   },
   "keywords": [
     "paperclip",
@@ -44,7 +44,7 @@
     "test": "node --test --import=tsx tests/*.spec.ts"
   },
   "dependencies": {
-    "@paperclipai/plugin-sdk": "^2026.428.0"
+    "@paperclipai/plugin-sdk": "^2026.831.1"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",

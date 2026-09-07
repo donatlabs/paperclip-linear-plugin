@@ -186,10 +186,10 @@ export function LinearPage(_props: PluginPageProps) {
 
       {/* Project linking */}
       <section style={s.card}>
-        <strong style={s.heading}>3. Link Paperclip projects ↔ Linear projects</strong>
+        <strong style={s.heading}>3. Link Tandem projects ↔ Linear projects</strong>
         <div style={s.subtle}>
-          Pick a Linear project for each Paperclip project you want to sync. New
-          Paperclip issues in a linked project push to Linear; Linear issues
+          Pick a Linear project for each Tandem project you want to sync. New
+          Tandem issues in a linked project push to Linear; Linear issues
           with the{" "}
           <code style={s.code}>{health.data?.importLabelName ?? "paperclip"}</code>{" "}
           label are imported back so agents can pick them up.
@@ -216,7 +216,7 @@ export function LinearPage(_props: PluginPageProps) {
           />
         ) : (
           <div style={s.subtle}>
-            No Paperclip projects found yet. Create one in Paperclip and return
+            No Tandem projects found yet. Create one in Tandem and return
             here.
           </div>
         )}

@@ -10,6 +10,7 @@
  * - `onHealth` — surfaces last-sync / last-webhook timestamps.
  */
 
+import { readSetupConfig } from "./setup-config.js";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   definePlugin,
@@ -91,7 +92,10 @@ function asRecord(value: object): Record<string, unknown> {
 }
 
 async function loadConfig(ctx: PluginContext): Promise<LinearPluginConfig> {
-  const raw = (await ctx.config.get()) as Partial<LinearPluginConfig>;
+  // Config is per company on the host; the plugin names the company it
+  // serves (one per instance on a hosted workspace) and starts with the
+  // defaults when that company has no config yet.
+  const { config: raw } = await readSetupConfig<LinearPluginConfig>(ctx);
   return {
     ...DEFAULT_CONFIG,
     ...raw,
