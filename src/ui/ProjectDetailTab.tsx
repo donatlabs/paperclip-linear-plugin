@@ -153,7 +153,7 @@ export function LinearProjectDetailTab({ context }: PluginDetailTabProps) {
           </ul>
         ) : (
           <div style={s.subtle}>
-            New issues created in this Paperclip project will be pushed to Linear
+            New issues created in this Tandem project will be pushed to Linear
             once you link a Linear team (and optionally a Linear project) below.
             Linear issues that carry the{" "}
             <code style={s.code}>{importLabelName}</code> label and live in the
@@ -289,7 +289,7 @@ export function LinearProjectDetailTab({ context }: PluginDetailTabProps) {
         <section style={s.card}>
           <strong style={s.heading}>Backfill existing issues</strong>
           <div style={s.subtle}>
-            Pushes every existing Paperclip issue in this project to Linear.
+            Pushes every existing Tandem issue in this project to Linear.
             Issues already linked are skipped — safe to run multiple times.
           </div>
           <div style={s.row}>
