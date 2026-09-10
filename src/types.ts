@@ -57,7 +57,7 @@ export const DEFAULT_CONFIG: Required<
   pushPaperclipIssues: true,
   importLinearIssues: true,
   incrementalSyncMinutes: 1,
-  importLabelName: "paperclip",
+  importLabelName: "tandem",
 };
 
 /** Where one imported Linear issue lands. */

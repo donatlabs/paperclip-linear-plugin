@@ -105,11 +105,11 @@ describe("Linear plugin manifest", () => {
     assert.equal(props.apiKeyRef?.format, "secret-ref");
   });
 
-  it("declares an importLabelName with default 'paperclip'", () => {
+  it("declares an importLabelName with default 'tandem'", () => {
     const props = (manifest.instanceConfigSchema as {
       properties: Record<string, { default?: unknown }>;
     }).properties;
-    assert.equal(props.importLabelName?.default, "paperclip");
+    assert.equal(props.importLabelName?.default, "tandem");
   });
 
   it("pulls labelled issues every minute", () => {
@@ -190,10 +190,13 @@ describe("Linear plugin worker (test harness)", () => {
         Date.now() - Date.parse(cursor) < 60_000,
         `the cursor starts now, not in the past: ${cursor}`,
       );
-      assert.deepEqual(
-        linear.queries,
-        [],
+      assert.ok(
+        linear.queries.every((q) => !q.includes("IssuesUpdatedSince")),
         "connecting a tracker must not sweep a backlog into the workspace",
+      );
+      assert.ok(
+        linear.queries.some((q) => q.toLowerCase().includes("label")),
+        "the label the workspace asks people to use is made on the way in",
       );
       assert.equal(
         (await harness.ctx.issues.list({ companyId: COMPANY_ID })).length,

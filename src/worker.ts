@@ -969,6 +969,13 @@ async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
     stateKey: STATE_KEYS.syncCursor,
   })) as string | null;
   if (!stored) {
+    // Make the label in Linear now, so the person who just connected can
+    // find it on an issue instead of typing a name that does not exist yet.
+    try {
+      await ensureImportLabel();
+    } catch (error) {
+      ctx.logger.warn("Could not create the import label", { error: summarizeError(error) });
+    }
     const startedAt = new Date().toISOString();
     await ctx.state.set(
       { scopeKind: "instance", namespace: STATE_NAMESPACE, stateKey: STATE_KEYS.syncCursor },
@@ -985,8 +992,7 @@ async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
     activity({
       level: "info",
       source: "job",
-      message:
-        "First sync — issues labelled from now on come in automatically; existing ones with “Import labelled issues”",
+      message: `First sync — the "${labelName}" label is ready in Linear; issues labelled from now on come in automatically, existing ones with “Import labelled issues”`,
     });
     return;
   }
