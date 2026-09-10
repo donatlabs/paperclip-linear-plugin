@@ -99,10 +99,23 @@ describe("Linear plugin manifest", () => {
 
   it("offers both a raw apiKey field and an apiKeyRef secret-ref", () => {
     const props = (manifest.instanceConfigSchema as {
-      properties: Record<string, { format?: string; type?: string }>;
+      properties: Record<string, { format?: string; type?: string | string[] }>;
     }).properties;
     assert.equal(props.apiKey?.type, "string");
     assert.equal(props.apiKeyRef?.format, "secret-ref");
+  });
+
+  it("takes a secret reference as the host writes it, or as a UUID", () => {
+    const props = (manifest.instanceConfigSchema as {
+      properties: Record<string, { type?: string | string[] }>;
+    }).properties;
+    for (const field of ["apiKeyRef", "webhookSecretRef"]) {
+      assert.deepEqual(
+        props[field]?.type,
+        ["string", "object"],
+        `${field} must accept the host's {type:"secret_ref"} binding as well as a UUID`,
+      );
+    }
   });
 
   it("declares an importLabelName with default 'tandem'", () => {
