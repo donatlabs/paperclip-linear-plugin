@@ -109,6 +109,17 @@ const manifest: PaperclipPluginManifestV1 = {
           "Linear label name that gates imports — only Linear issues with this label are pulled into Tandem. The plugin auto-creates the label on first sync.",
         default: DEFAULT_CONFIG.importLabelName,
       },
+      defaultProjectId: {
+        type: "string",
+        title: "Default project for imported issues",
+        description:
+          "Where a labelled Linear issue lands when its Linear project is not linked to a Tandem project, or has none. A workspace with a single project can leave this empty.",
+      },
+      defaultCompanyId: {
+        type: "string",
+        title: "Company owning the default project",
+        description: "Optional; found from the project when left empty.",
+      },
       incrementalSyncMinutes: {
         type: "integer",
         title: "Incremental Sync Frequency (minutes)",

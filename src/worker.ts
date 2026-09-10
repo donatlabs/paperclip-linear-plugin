@@ -42,6 +42,7 @@ import {
 import { LinearApiError, LinearClient } from "./linear-client.js";
 import {
   DEFAULT_CONFIG,
+  type ImportTarget,
   type LinearIssue,
   type LinearIssueLink,
   type LinearLabel,
@@ -710,26 +711,16 @@ async function handleLinearIssueWebhook(
     return;
   }
 
-  const linearProjectId = data.project?.id;
-  if (!linearProjectId) {
+  const linearProjectId = data.project?.id ?? null;
+  const target = await importTarget(ctx, config, linearProjectId);
+  if (!target) {
     activity({
       level: "warning",
       source: "webhook",
-      message: `Linear ${data.identifier ?? linearIssueId} has the import label but no Linear project — skipping`,
+      message: `Linear ${data.identifier ?? linearIssueId} carries the "${labelName}" label but has nowhere to land — name a default project in the Linear settings, or link its Linear project`,
     });
     return;
   }
-  const paperclipProjectId = await findPaperclipProjectByLinearProject(ctx, linearProjectId);
-  if (!paperclipProjectId) {
-    activity({
-      level: "warning",
-      source: "webhook",
-      message: `Linear project ${data.project?.name ?? linearProjectId} is not linked to a Paperclip project`,
-    });
-    return;
-  }
-  const projectLink = await getProjectLink(ctx, paperclipProjectId);
-  if (!projectLink) return;
 
   const title = data.title ?? `Linear ${data.identifier ?? linearIssueId}`;
   const description = typeof data.description === "string" ? data.description : undefined;
@@ -737,8 +728,8 @@ async function handleLinearIssueWebhook(
   try {
     // The host derives originKind="plugin:paperclip.linear" from the installed plugin.
     const created = await ctx.issues.create({
-      companyId: projectLink.companyId,
-      projectId: paperclipProjectId,
+      companyId: target.companyId,
+      projectId: target.projectId,
       title,
       ...(description !== undefined ? { description } : {}),
       originId: linearIssueId,
@@ -748,7 +739,7 @@ async function handleLinearIssueWebhook(
       linearIssueId,
       linearIdentifier: data.identifier ?? linearIssueId,
       linearUrl: typeof data.url === "string" ? data.url : (payload.url ?? ""),
-      linearTeamId: data.team?.id ?? projectLink.linearTeamId,
+      linearTeamId: data.team?.id ?? "",
       linearProjectId,
       pushedAt: new Date().toISOString(),
       lastSyncedAt: new Date().toISOString(),
@@ -822,6 +813,62 @@ async function runFullSync(_job: PluginJobContext): Promise<void> {
   });
 }
 
+/** The company a Tandem project belongs to, found by asking each company. */
+async function companyOfProject(
+  ctx: PluginContext,
+  paperclipProjectId: string,
+): Promise<string | null> {
+  const companies = await ctx.companies.list({ limit: 100 });
+  for (const company of companies) {
+    const project = await ctx.projects.get(paperclipProjectId, company.id);
+    if (project) return company.id;
+  }
+  return null;
+}
+
+/**
+ * Where a labelled Linear issue lands, in the order a person would expect:
+ *
+ *  1. the Tandem project its Linear project is linked to, when someone has
+ *     linked them;
+ *  2. the default project the workspace names in the plugin's settings;
+ *  3. the workspace's only project, when it has exactly one — the common
+ *     case, and the one where asking anybody to map anything is silly.
+ *
+ * Nothing left? Then the issue has no home, and the plugin says so rather
+ * than dropping it quietly: the workspace has several projects and nobody
+ * has said which one Linear issues belong to.
+ */
+async function importTarget(
+  ctx: PluginContext,
+  config: LinearPluginConfig,
+  linearProjectId: string | null,
+): Promise<ImportTarget | null> {
+  if (linearProjectId) {
+    const paperclipProjectId = await findPaperclipProjectByLinearProject(ctx, linearProjectId);
+    if (paperclipProjectId) {
+      const link = await getProjectLink(ctx, paperclipProjectId);
+      if (link) {
+        return { companyId: link.companyId, projectId: paperclipProjectId, linearProjectId };
+      }
+    }
+  }
+
+  const named = (config.defaultProjectId ?? "").trim();
+  if (named) {
+    const companyId = (config.defaultCompanyId ?? "").trim() || (await companyOfProject(ctx, named));
+    if (companyId) return { companyId, projectId: named, linearProjectId };
+  }
+
+  const companies = await ctx.companies.list({ limit: 2 });
+  const only = companies.length === 1 ? companies[0] : null;
+  if (!only) return null;
+  const projects = await ctx.projects.list({ companyId: only.id, limit: 2 });
+  const project = projects.length === 1 ? projects[0] : null;
+  if (!project) return null;
+  return { companyId: only.id, projectId: project.id, linearProjectId };
+}
+
 /**
  * Import one labelled Linear issue into a linked Tandem project, unless it is
  * already linked (then this returns null and nothing is created).
@@ -834,8 +881,7 @@ async function runFullSync(_job: PluginJobContext): Promise<void> {
 async function importLinearIssue(
   ctx: PluginContext,
   issue: LinearIssue,
-  paperclipProjectId: string,
-  link: LinearProjectLink,
+  target: ImportTarget,
 ): Promise<string | null> {
   const linked = await ctx.entities.list({
     entityType: ENTITY_TYPES.linearIssue,
@@ -846,8 +892,8 @@ async function importLinearIssue(
 
   const description = issue.description ?? undefined;
   const created = await ctx.issues.create({
-    companyId: link.companyId,
-    projectId: paperclipProjectId,
+    companyId: target.companyId,
+    projectId: target.projectId,
     title: issue.title,
     ...(description !== undefined ? { description } : {}),
     originId: issue.id,
@@ -857,7 +903,7 @@ async function importLinearIssue(
     linearIdentifier: issue.identifier,
     linearUrl: issue.url,
     linearTeamId: issue.team.id,
-    linearProjectId: issue.project?.id ?? link.linearProjectId,
+    linearProjectId: issue.project?.id ?? target.linearProjectId ?? null,
     pushedAt: new Date().toISOString(),
     lastSyncedAt: new Date().toISOString(),
   };
@@ -952,6 +998,8 @@ async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
   });
 
   let newest = cursor;
+  /** Labelled issues this workspace has nowhere to put; reported once. */
+  const homeless: string[] = [];
   for (const issue of issues) {
     if (issue.updatedAt > newest) newest = issue.updatedAt;
     if (!issueHasLabelOnObject(issue, labelName)) continue;
@@ -975,17 +1023,16 @@ async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
       continue;
     }
 
-    // Otherwise import if it lives under a mapped Linear project.
+    // Otherwise import it, wherever this workspace puts labelled issues.
     if (!config.importLinearIssues) continue;
-    const linearProjectId = issue.project?.id;
-    if (!linearProjectId) continue;
-    const paperclipProjectId = await findPaperclipProjectByLinearProject(ctx, linearProjectId);
-    if (!paperclipProjectId) continue;
-    const projectLink = await getProjectLink(ctx, paperclipProjectId);
-    if (!projectLink) continue;
+    const target = await importTarget(ctx, config, issue.project?.id ?? null);
+    if (!target) {
+      homeless.push(issue.identifier);
+      continue;
+    }
 
     try {
-      const created = await importLinearIssue(ctx, issue, paperclipProjectId, projectLink);
+      const created = await importLinearIssue(ctx, issue, target);
       if (created) {
         activity({
           level: "info",
@@ -1013,6 +1060,13 @@ async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
     },
     new Date().toISOString(),
   );
+  if (homeless.length > 0) {
+    activity({
+      level: "warning",
+      source: "job",
+      message: `${homeless.length} labelled issue(s) have nowhere to land (${homeless.slice(0, 3).join(", ")}) — name a default project in the Linear settings, or link their Linear project`,
+    });
+  }
   activity({
     level: "info",
     source: "job",
@@ -1386,11 +1440,17 @@ function registerActionHandlers(ctx: PluginContext): void {
     const paperclipProjectId =
       typeof params.paperclipProjectId === "string" ? params.paperclipProjectId : null;
     if (!paperclipProjectId) throw new Error("paperclipProjectId is required");
+    // A link is not required: importing into the project someone is looking
+    // at is the plain reading of the button. When the project *is* linked to
+    // a Linear project, only that project's issues come in.
     const link = await getProjectLink(ctx, paperclipProjectId);
-    if (!link) throw new Error("Tandem project is not linked yet");
-    if (!link.linearProjectId) {
-      throw new Error("This link has no Linear project, so there is nothing to import from");
-    }
+    const companyId = link?.companyId ?? (await companyOfProject(ctx, paperclipProjectId));
+    if (!companyId) throw new Error("That Tandem project could not be found");
+    const target: ImportTarget = {
+      companyId,
+      projectId: paperclipProjectId,
+      linearProjectId: link?.linearProjectId ?? null,
+    };
     const labelName =
       requireConfig().importLabelName ?? DEFAULT_CONFIG.importLabelName;
     if (!labelName) throw new Error("No import label is configured");
@@ -1400,7 +1460,7 @@ function registerActionHandlers(ctx: PluginContext): void {
     // what the team touched most recently — the part of a backlog anyone
     // would want first.
     const issues = await requireClient().issuesUpdatedSince(BEGINNING_OF_TIME, {
-      projectId: link.linearProjectId,
+      ...(target.linearProjectId ? { projectId: target.linearProjectId } : {}),
       labelName,
       limit,
     });
@@ -1410,7 +1470,7 @@ function registerActionHandlers(ctx: PluginContext): void {
     let failed = 0;
     for (const issue of issues) {
       try {
-        const created = await importLinearIssue(ctx, issue, paperclipProjectId, link);
+        const created = await importLinearIssue(ctx, issue, target);
         if (created) imported += 1;
         else skipped += 1;
       } catch (error) {

@@ -32,6 +32,15 @@ export interface LinearPluginConfig {
   importLabelName?: string;
   /** Polling interval for incremental sync in minutes. */
   incrementalSyncMinutes?: number;
+  /**
+   * Where a labelled Linear issue lands when its Linear project is not
+   * linked to a Tandem project — or when it has no Linear project at all.
+   * A workspace with a single project needs neither of these: that project
+   * is the only answer, and the plugin uses it.
+   */
+  defaultProjectId?: string;
+  /** The company owning defaultProjectId; found from the project if unset. */
+  defaultCompanyId?: string;
 }
 
 export const DEFAULT_CONFIG: Required<
@@ -50,6 +59,16 @@ export const DEFAULT_CONFIG: Required<
   incrementalSyncMinutes: 1,
   importLabelName: "paperclip",
 };
+
+/** Where one imported Linear issue lands. */
+export interface ImportTarget {
+  /** Tandem company that owns the project. */
+  companyId: string;
+  /** Tandem project the issue is created in. */
+  projectId: string;
+  /** The Linear project it came from, when it had one. */
+  linearProjectId: string | null;
+}
 
 /** Per-Paperclip-project ↔ Linear-project link. */
 export interface LinearProjectLink {

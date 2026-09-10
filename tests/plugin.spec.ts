@@ -60,6 +60,22 @@ function linearIssue(id: string, identifier: string, title: string) {
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 const COMPANY_ID = "22222222-2222-4222-8222-222222222222";
 
+/** One company with one project: the shape of a Tandem workspace. */
+function seedWorkspace(harness: ReturnType<typeof createTestHarness>, projects = [PROJECT_ID]) {
+  harness.seed({
+    companies: [{ id: COMPANY_ID, name: "Acme", createdAt: new Date(), updatedAt: new Date() }] as never,
+    projects: projects.map((id, i) => ({
+      id,
+      companyId: COMPANY_ID,
+      name: `Project ${i + 1}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })) as never,
+  });
+}
+
+const OTHER_PROJECT_ID = "33333333-3333-4333-8333-333333333333";
+
 const projectLink = {
   paperclipProjectId: PROJECT_ID,
   companyId: COMPANY_ID,
@@ -234,6 +250,7 @@ describe("Linear plugin worker (test harness)", () => {
         config: { apiKey: "lin_test", importLabelName: "tandem" },
       });
       await plugin.definition.setup(harness.ctx);
+      seedWorkspace(harness);
       await harness.ctx.state.set(
         {
           scopeKind: "project",
@@ -272,7 +289,7 @@ describe("Linear plugin worker (test harness)", () => {
     }
   });
 
-  it("refuses to import for a project that is not linked", async () => {
+  it("refuses to import into a project the workspace does not have", async () => {
     const harness = createTestHarness({
       manifest,
       capabilities: manifest.capabilities,
@@ -281,8 +298,83 @@ describe("Linear plugin worker (test harness)", () => {
     await plugin.definition.setup(harness.ctx);
     await assert.rejects(
       () => harness.performAction(ACTION_KEYS.importProject, { paperclipProjectId: PROJECT_ID }),
-      /not linked/,
+      /could not be found/,
     );
+  });
+
+  it("puts labelled issues in the only project when nothing is mapped", async () => {
+    const linear = fakeLinear([linearIssue("linear-9", "ACME-9", "Nothing mapped")]);
+    try {
+      const harness = createTestHarness({
+        manifest,
+        capabilities: manifest.capabilities,
+        config: { apiKey: "lin_test", importLabelName: "tandem" },
+      });
+      await plugin.definition.setup(harness.ctx);
+      seedWorkspace(harness);
+      // No project link at all: the workspace has one project, so that is
+      // where a labelled issue belongs.
+      await harness.ctx.state.set(
+        {
+          scopeKind: "instance",
+          namespace: STATE_NAMESPACE,
+          stateKey: STATE_KEYS.syncCursor,
+        },
+        "2026-01-01T00:00:00.000Z",
+      );
+
+      await harness.runJob(JOB_KEYS.incrementalSync);
+
+      const issues = await harness.ctx.issues.list({ companyId: COMPANY_ID });
+      assert.deepEqual(
+        issues.map((issue) => [issue.title, issue.projectId]),
+        [["Nothing mapped", PROJECT_ID]],
+      );
+    } finally {
+      linear.restore();
+    }
+  });
+
+  it("says so when a workspace with several projects has named none", async () => {
+    const linear = fakeLinear([linearIssue("linear-9", "ACME-9", "Homeless")]);
+    try {
+      const harness = createTestHarness({
+        manifest,
+        capabilities: manifest.capabilities,
+        config: { apiKey: "lin_test", importLabelName: "tandem" },
+      });
+      await plugin.definition.setup(harness.ctx);
+      seedWorkspace(harness, [PROJECT_ID, OTHER_PROJECT_ID]);
+      const scope = { scopeKind: "instance" as const, namespace: STATE_NAMESPACE };
+      await harness.ctx.state.set({ ...scope, stateKey: STATE_KEYS.syncCursor }, "2026-01-01T00:00:00.000Z");
+
+      await harness.runJob(JOB_KEYS.incrementalSync);
+      assert.equal((await harness.ctx.issues.list({ companyId: COMPANY_ID })).length, 0);
+
+      const activity = (await harness.getData(DATA_KEYS.recentActivity, {})) as {
+        entries: Array<{ level: string; message: string }>;
+      };
+      assert.ok(
+        activity.entries.some((e) => e.level === "warning" && e.message.includes("nowhere to land")),
+        `expected a warning, got ${JSON.stringify(activity.entries)}`,
+      );
+
+      // Naming one is all it takes.
+      await plugin.definition.onConfigChanged?.({
+        apiKey: "lin_test",
+        importLabelName: "tandem",
+        defaultProjectId: OTHER_PROJECT_ID,
+      } as never);
+      await harness.ctx.state.set({ ...scope, stateKey: STATE_KEYS.lastIncrementalSyncAt }, new Date(0).toISOString());
+      await harness.runJob(JOB_KEYS.incrementalSync);
+      const issues = await harness.ctx.issues.list({ companyId: COMPANY_ID });
+      assert.deepEqual(
+        issues.map((issue) => issue.projectId),
+        [OTHER_PROJECT_ID],
+      );
+    } finally {
+      linear.restore();
+    }
   });
 
   it("rejects unknown webhook endpoint keys", async () => {
