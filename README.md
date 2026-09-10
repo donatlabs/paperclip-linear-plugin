@@ -13,6 +13,24 @@ Connects a Paperclip instance to a [Linear](https://linear.app) workspace.
 - **Expose** two agent tools: `create-linear-issue` and `search-linear-issues`,
   so Paperclip agents can interact with Linear during a run.
 
+## What import does, and what it does not
+
+Importing is not starting work. An imported Linear issue lands in the
+backlog with nobody assigned; an agent takes it when a person hands it over.
+A tracker with hundreds of labelled issues therefore fills a backlog, not a
+queue of runs.
+
+Two ways in, and both are deliberate:
+
+- **From now on.** The first incremental sync after a workspace connects
+  records the moment it ran. Issues labelled after that come in on their own,
+  within one sync cadence. Nothing older is swept in because a tracker was
+  connected.
+- **What the team already has.** The *Import labelled issues* button on a
+  linked project brings in existing labelled issues, up to
+  `IMPORT_BATCH_DEFAULT` per press (25, `limit` raises it to at most 100).
+  Issues already linked are skipped, so pressing it twice is safe.
+
 ## Capabilities
 
 The plugin requests only the capabilities it needs:

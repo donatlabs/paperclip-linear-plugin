@@ -31,6 +31,8 @@ import {
   DATA_KEYS,
   DEFAULTS,
   ENTITY_TYPES,
+  IMPORT_BATCH_DEFAULT,
+  IMPORT_BATCH_MAX,
   JOB_KEYS,
   STATE_KEYS,
   STATE_NAMESPACE,
@@ -80,6 +82,9 @@ function activity(entry: Omit<RecentActivityEntry, "id" | "createdAt">): RecentA
   }
   return next;
 }
+
+/** Where "everything the team already has" starts, for a deliberate import. */
+const BEGINNING_OF_TIME = "1970-01-01T00:00:00.000Z";
 
 function summarizeError(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -817,6 +822,65 @@ async function runFullSync(_job: PluginJobContext): Promise<void> {
   });
 }
 
+/**
+ * Import one labelled Linear issue into a linked Tandem project, unless it is
+ * already linked (then this returns null and nothing is created).
+ *
+ * Importing is not starting work. The issue lands where every new Tandem
+ * issue lands — the backlog, with nobody assigned — so a Linear workspace
+ * with hundreds of labelled issues fills a backlog rather than starting
+ * hundreds of agents. Work begins when a person hands the issue to an agent.
+ */
+async function importLinearIssue(
+  ctx: PluginContext,
+  issue: LinearIssue,
+  paperclipProjectId: string,
+  link: LinearProjectLink,
+): Promise<string | null> {
+  const linked = await ctx.entities.list({
+    entityType: ENTITY_TYPES.linearIssue,
+    externalId: issue.id,
+    limit: 1,
+  });
+  if (linked[0]?.scopeId) return null;
+
+  const description = issue.description ?? undefined;
+  const created = await ctx.issues.create({
+    companyId: link.companyId,
+    projectId: paperclipProjectId,
+    title: issue.title,
+    ...(description !== undefined ? { description } : {}),
+    originId: issue.id,
+  });
+  const issueLink: LinearIssueLink = {
+    linearIssueId: issue.id,
+    linearIdentifier: issue.identifier,
+    linearUrl: issue.url,
+    linearTeamId: issue.team.id,
+    linearProjectId: issue.project?.id ?? link.linearProjectId,
+    pushedAt: new Date().toISOString(),
+    lastSyncedAt: new Date().toISOString(),
+  };
+  await setIssueLink(ctx, created.id, issueLink);
+  await ctx.entities.upsert({
+    entityType: ENTITY_TYPES.linearIssue,
+    scopeKind: "issue",
+    scopeId: created.id,
+    externalId: issue.id,
+    title: issue.title,
+    status: issue.state.name,
+    data: asRecord(issue),
+  });
+  return created.id;
+}
+
+/** The batch one press of "Import labelled issues" is allowed to bring in. */
+function importBatchSize(value: unknown): number {
+  const asked = typeof value === "number" ? Math.floor(value) : IMPORT_BATCH_DEFAULT;
+  if (!Number.isFinite(asked) || asked < 1) return IMPORT_BATCH_DEFAULT;
+  return Math.min(asked, IMPORT_BATCH_MAX);
+}
+
 async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
   const ctx = requireCtx();
   const config = requireConfig();
@@ -829,12 +893,39 @@ async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
   // over all project links" since we upsert one per linked project elsewhere.
   // We keep a fallback wide-net query for unrelated linked issues that may have
   // already been imported.
-  const cursor =
-    ((await ctx.state.get({
-      scopeKind: "instance",
-      namespace: STATE_NAMESPACE,
-      stateKey: STATE_KEYS.syncCursor,
-    })) as string | null) ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  // The cursor is where automatic import starts. On the first run after a
+  // workspace connects Linear it starts *now*: whatever the team already has
+  // in Linear comes in when someone presses "Import labelled issues", not
+  // because the tracker was connected. From here on, labelling an issue is
+  // the ordinary way in.
+  const stored = (await ctx.state.get({
+    scopeKind: "instance",
+    namespace: STATE_NAMESPACE,
+    stateKey: STATE_KEYS.syncCursor,
+  })) as string | null;
+  if (!stored) {
+    const startedAt = new Date().toISOString();
+    await ctx.state.set(
+      { scopeKind: "instance", namespace: STATE_NAMESPACE, stateKey: STATE_KEYS.syncCursor },
+      startedAt,
+    );
+    await ctx.state.set(
+      {
+        scopeKind: "instance",
+        namespace: STATE_NAMESPACE,
+        stateKey: STATE_KEYS.lastIncrementalSyncAt,
+      },
+      startedAt,
+    );
+    activity({
+      level: "info",
+      source: "job",
+      message:
+        "First sync — issues labelled from now on come in automatically; existing ones with “Import labelled issues”",
+    });
+    return;
+  }
+  const cursor = stored;
 
   const issues = await requireClient().issuesUpdatedSince(cursor, {
     labelName,
@@ -875,38 +966,14 @@ async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
     if (!projectLink) continue;
 
     try {
-      const description = issue.description ?? undefined;
-      const created = await ctx.issues.create({
-        companyId: projectLink.companyId,
-        projectId: paperclipProjectId,
-        title: issue.title,
-        ...(description !== undefined ? { description } : {}),
-        originId: issue.id,
-      });
-      const link: LinearIssueLink = {
-        linearIssueId: issue.id,
-        linearIdentifier: issue.identifier,
-        linearUrl: issue.url,
-        linearTeamId: issue.team.id,
-        linearProjectId,
-        pushedAt: new Date().toISOString(),
-        lastSyncedAt: new Date().toISOString(),
-      };
-      await setIssueLink(ctx, created.id, link);
-      await ctx.entities.upsert({
-        entityType: ENTITY_TYPES.linearIssue,
-        scopeKind: "issue",
-        scopeId: created.id,
-        externalId: issue.id,
-        title: issue.title,
-        status: issue.state.name,
-        data: asRecord(issue),
-      });
-      activity({
-        level: "info",
-        source: "job",
-        message: `Imported ${issue.identifier} via incremental sync`,
-      });
+      const created = await importLinearIssue(ctx, issue, paperclipProjectId, projectLink);
+      if (created) {
+        activity({
+          level: "info",
+          source: "job",
+          message: `Imported ${issue.identifier} via incremental sync`,
+        });
+      }
     } catch (error) {
       ctx.logger.error("Incremental import failed", {
         issueId: issue.id,
@@ -940,7 +1007,7 @@ async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
 
 function registerDataHandlers(ctx: PluginContext): void {
   ctx.data.register(DATA_KEYS.syncHealth, async () => {
-    const [lastFull, lastInc, lastHook] = await Promise.all([
+    const [lastFull, lastInc, lastHook, importingSince] = await Promise.all([
       ctx.state.get({
         scopeKind: "instance",
         namespace: STATE_NAMESPACE,
@@ -956,6 +1023,11 @@ function registerDataHandlers(ctx: PluginContext): void {
         namespace: STATE_NAMESPACE,
         stateKey: STATE_KEYS.lastWebhookAt,
       }),
+      ctx.state.get({
+        scopeKind: "instance",
+        namespace: STATE_NAMESPACE,
+        stateKey: STATE_KEYS.syncCursor,
+      }),
     ]);
     const links = await ctx.entities.list({
       entityType: ENTITY_TYPES.linearIssue,
@@ -970,6 +1042,9 @@ function registerDataHandlers(ctx: PluginContext): void {
       linkedIssueCount: links.length,
       importLabelName:
         currentConfig?.importLabelName ?? DEFAULT_CONFIG.importLabelName,
+      // Where automatic import starts: issues labelled after this come in on
+      // their own, older ones only when someone imports them.
+      importingSince: importingSince as string | null,
     };
   });
 
@@ -1282,6 +1357,57 @@ function registerActionHandlers(ctx: PluginContext): void {
       message: `Backfill: ${pushed} pushed, ${skipped} already linked, ${failed} failed, ${parentLinks} parent links`,
     });
     return { ok: true, pushed, skipped, failed, parentLinks };
+  });
+
+  // Bringing in the issues a team already has is a decision, not a side
+  // effect of connecting a tracker: it happens when someone presses the
+  // button, one capped batch at a time. Issues already linked are skipped,
+  // so pressing it twice is safe.
+  ctx.actions.register(ACTION_KEYS.importProject, async (params) => {
+    const paperclipProjectId =
+      typeof params.paperclipProjectId === "string" ? params.paperclipProjectId : null;
+    if (!paperclipProjectId) throw new Error("paperclipProjectId is required");
+    const link = await getProjectLink(ctx, paperclipProjectId);
+    if (!link) throw new Error("Tandem project is not linked yet");
+    if (!link.linearProjectId) {
+      throw new Error("This link has no Linear project, so there is nothing to import from");
+    }
+    const labelName =
+      requireConfig().importLabelName ?? DEFAULT_CONFIG.importLabelName;
+    if (!labelName) throw new Error("No import label is configured");
+    const limit = importBatchSize(params.limit);
+
+    // Linear orders `updatedAt` newest first, so a capped press brings in
+    // what the team touched most recently — the part of a backlog anyone
+    // would want first.
+    const issues = await requireClient().issuesUpdatedSince(BEGINNING_OF_TIME, {
+      projectId: link.linearProjectId,
+      labelName,
+      limit,
+    });
+
+    let imported = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const issue of issues) {
+      try {
+        const created = await importLinearIssue(ctx, issue, paperclipProjectId, link);
+        if (created) imported += 1;
+        else skipped += 1;
+      } catch (error) {
+        failed += 1;
+        ctx.logger.error("Import failed", {
+          issueId: issue.id,
+          error: summarizeError(error),
+        });
+      }
+    }
+    activity({
+      level: failed > 0 ? "warning" : "info",
+      source: "action",
+      message: `Import: ${imported} imported, ${skipped} already linked, ${failed} failed`,
+    });
+    return { ok: true, imported, skipped, failed, examined: issues.length, limit };
   });
 
   ctx.actions.register(ACTION_KEYS.unlinkProject, async (params) => {
