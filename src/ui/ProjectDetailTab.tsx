@@ -292,7 +292,8 @@ export function LinearProjectDetailTab({ context }: PluginDetailTabProps) {
           <div style={s.subtle}>
             Issues labelled <code>{importLabelName}</code> in Linear come in on
             their own from the moment this workspace connected. Existing ones
-            are brought in here, a batch at a time
+            are brought in here, a batch at a time — labelled ones, or simply
+            the most recent, for a team that has not labelled anything yet
             {link?.linearProjectId ? ` from ${link.linearProjectName ?? "the linked Linear project"}` : ""}.
             They land in the backlog — importing does not start any work.
           </div>
@@ -330,6 +331,36 @@ export function LinearProjectDetailTab({ context }: PluginDetailTabProps) {
               }}
             >
               {busy === "import" ? "Importing…" : "Import labelled issues"}
+            </button>
+            <button
+              type="button"
+              style={s.button}
+              disabled={busy !== null}
+              onClick={async () => {
+                setBusy("import-any");
+                setImportResult(null);
+                try {
+                  const result = (await importIssues({
+                    paperclipProjectId: projectId,
+                    labelled: false,
+                  })) as { imported: number; skipped: number; failed: number };
+                  setImportResult(
+                    [
+                      `${result.imported} imported`,
+                      `${result.skipped} already linked`,
+                      `${result.failed} failed`,
+                    ].join(", "),
+                  );
+                } catch (error) {
+                  setImportResult(
+                    error instanceof Error ? error.message : String(error),
+                  );
+                } finally {
+                  setBusy(null);
+                }
+              }}
+            >
+              {busy === "import-any" ? "Importing…" : "Import recent issues"}
             </button>
             {importResult ? <span style={s.subtle}>{importResult}</span> : null}
           </div>

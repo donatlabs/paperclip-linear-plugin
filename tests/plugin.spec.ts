@@ -203,9 +203,11 @@ describe("Linear plugin worker (test harness)", () => {
         Date.now() - Date.parse(cursor) < 60_000,
         `the cursor starts now, not in the past: ${cursor}`,
       );
-      assert.ok(
-        linear.queries.every((q) => !q.includes("IssuesUpdatedSince")),
-        "connecting a tracker must not sweep a backlog into the workspace",
+      // Nothing is swept in beyond the first handful: this workspace has no
+      // company or project seeded, so there is nowhere for issues to land.
+      assert.equal(
+        (await harness.ctx.issues.list({ companyId: COMPANY_ID })).length,
+        0,
       );
       assert.ok(
         linear.queries.some((q) => q.toLowerCase().includes("label")),
@@ -214,6 +216,68 @@ describe("Linear plugin worker (test harness)", () => {
       assert.equal(
         (await harness.ctx.issues.list({ companyId: COMPANY_ID })).length,
         0,
+      );
+    } finally {
+      linear.restore();
+    }
+  });
+
+  it("brings a handful of issues in on the first sync, label or no label", async () => {
+    const linear = fakeLinear([
+      linearIssue("linear-1", "ACME-1", "Unlabelled but real"),
+      linearIssue("linear-2", "ACME-2", "Also unlabelled"),
+    ]);
+    try {
+      const harness = createTestHarness({
+        manifest,
+        capabilities: manifest.capabilities,
+        config: { apiKey: "lin_test", importLabelName: "tandem" },
+      });
+      await plugin.definition.setup(harness.ctx);
+      seedWorkspace(harness);
+
+      await harness.runJob(JOB_KEYS.incrementalSync);
+
+      const issues = await harness.ctx.issues.list({ companyId: COMPANY_ID });
+      assert.deepEqual(
+        issues.map((issue) => issue.title).sort(),
+        ["Also unlabelled", "Unlabelled but real"],
+        "a workspace that has just connected must not look empty",
+      );
+      for (const issue of issues) {
+        assert.equal(issue.assigneeAgentId, null, "and still nothing starts on its own");
+      }
+      // The cursor is set all the same, so nothing older is swept in later.
+      const cursor = harness.getState({
+        scopeKind: "instance",
+        namespace: STATE_NAMESPACE,
+        stateKey: STATE_KEYS.syncCursor,
+      }) as string;
+      assert.ok(Date.now() - Date.parse(cursor) < 60_000, cursor);
+    } finally {
+      linear.restore();
+    }
+  });
+
+  it("imports the recent issues on demand for a team that labels nothing", async () => {
+    const linear = fakeLinear([linearIssue("linear-7", "ACME-7", "Never labelled")]);
+    try {
+      const harness = createTestHarness({
+        manifest,
+        capabilities: manifest.capabilities,
+        config: { apiKey: "lin_test", importLabelName: "tandem" },
+      });
+      await plugin.definition.setup(harness.ctx);
+      seedWorkspace(harness);
+
+      const result = (await harness.performAction(ACTION_KEYS.importProject, {
+        paperclipProjectId: PROJECT_ID,
+        labelled: false,
+      })) as { imported: number; labelled: boolean };
+      assert.deepEqual({ imported: result.imported, labelled: result.labelled }, { imported: 1, labelled: false });
+      assert.ok(
+        linear.queries.some((q) => q.includes("IssuesUpdatedSince")),
+        "it asks Linear for the project's issues",
       );
     } finally {
       linear.restore();

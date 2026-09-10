@@ -34,6 +34,7 @@ import {
   IMPORT_BATCH_DEFAULT,
   IMPORT_BATCH_MAX,
   JOB_KEYS,
+  STARTER_IMPORT,
   STATE_KEYS,
   STATE_NAMESPACE,
   TOOL_NAMES,
@@ -927,6 +928,40 @@ function importBatchSize(value: unknown): number {
   return Math.min(asked, IMPORT_BATCH_MAX);
 }
 
+/**
+ * The first sync's handful: the most recently touched issues of the project
+ * this workspace works on, whether or not anyone has labelled them. They
+ * land in the backlog like every other import — nothing starts on its own —
+ * and this runs once, on the sync that sets the cursor.
+ */
+async function importStarterIssues(
+  ctx: PluginContext,
+  config: LinearPluginConfig,
+): Promise<number> {
+  if (!config.importLinearIssues || !currentClient) return 0;
+  const target = await importTarget(ctx, config, null);
+  if (!target) return 0;
+  let issues: LinearIssue[] = [];
+  try {
+    issues = await requireClient().issuesUpdatedSince(BEGINNING_OF_TIME, {
+      ...(target.linearProjectId ? { projectId: target.linearProjectId } : {}),
+      limit: STARTER_IMPORT,
+    });
+  } catch (error) {
+    ctx.logger.warn("Could not read Linear for the first issues", { error: summarizeError(error) });
+    return 0;
+  }
+  let imported = 0;
+  for (const issue of issues) {
+    try {
+      if (await importLinearIssue(ctx, issue, target)) imported += 1;
+    } catch (error) {
+      ctx.logger.error("First import failed", { issueId: issue.id, error: summarizeError(error) });
+    }
+  }
+  return imported;
+}
+
 async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
   const ctx = requireCtx();
   const config = requireConfig();
@@ -989,10 +1024,16 @@ async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
       },
       startedAt,
     );
+    // A handful of what the team is actually working on, so the workspace
+    // has something in it before anyone has labelled a thing.
+    const starters = await importStarterIssues(ctx, config);
     activity({
       level: "info",
       source: "job",
-      message: `First sync — the "${labelName}" label is ready in Linear; issues labelled from now on come in automatically, existing ones with “Import labelled issues”`,
+      message:
+        `First sync — the "${labelName}" label is ready in Linear` +
+        (starters > 0 ? `, and ${starters} recent issue(s) came in to start with` : "") +
+        `; issues labelled from now on come in automatically, older ones with “Import labelled issues”`,
     });
     return;
   }
@@ -1459,7 +1500,12 @@ function registerActionHandlers(ctx: PluginContext): void {
     };
     const labelName =
       requireConfig().importLabelName ?? DEFAULT_CONFIG.importLabelName;
-    if (!labelName) throw new Error("No import label is configured");
+    // Labelled issues are the default; a workspace that has just connected
+    // has none, and asking someone to go and label a backlog before they
+    // see anything work is the wrong order. `labelled: false` brings in what
+    // the team touched most recently instead.
+    const onlyLabelled = params.labelled !== false;
+    if (onlyLabelled && !labelName) throw new Error("No import label is configured");
     const limit = importBatchSize(params.limit);
 
     // Linear orders `updatedAt` newest first, so a capped press brings in
@@ -1467,7 +1513,7 @@ function registerActionHandlers(ctx: PluginContext): void {
     // would want first.
     const issues = await requireClient().issuesUpdatedSince(BEGINNING_OF_TIME, {
       ...(target.linearProjectId ? { projectId: target.linearProjectId } : {}),
-      labelName,
+      ...(onlyLabelled ? { labelName } : {}),
       limit,
     });
 
@@ -1490,9 +1536,9 @@ function registerActionHandlers(ctx: PluginContext): void {
     activity({
       level: failed > 0 ? "warning" : "info",
       source: "action",
-      message: `Import: ${imported} imported, ${skipped} already linked, ${failed} failed`,
+      message: `Import${onlyLabelled ? "" : " (any label)"}: ${imported} imported, ${skipped} already linked, ${failed} failed`,
     });
-    return { ok: true, imported, skipped, failed, examined: issues.length, limit };
+    return { ok: true, imported, skipped, failed, examined: issues.length, limit, labelled: onlyLabelled };
   });
 
   ctx.actions.register(ACTION_KEYS.unlinkProject, async (params) => {

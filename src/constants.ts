@@ -5,7 +5,7 @@
  */
 
 export const PLUGIN_ID = "paperclip.linear";
-export const PLUGIN_VERSION = "0.5.1";
+export const PLUGIN_VERSION = "0.6.0";
 
 export const PAGE_ROUTE = "linear";
 
@@ -107,6 +107,19 @@ export const ACTIVITY_BUFFER_MAX = 50;
  */
 export const IMPORT_BATCH_DEFAULT = 25;
 export const IMPORT_BATCH_MAX = 100;
+
+/**
+ * How many issues the first sync brings in on its own, label or no label.
+ *
+ * Nobody has labelled anything the minute they connect a tracker, so a
+ * workspace that imports only labelled issues starts empty and looks like it
+ * does nothing. These are the most recently touched issues of the project
+ * the workspace works on: enough for an agent to read the room and for a
+ * person to see the connection working, few enough that a tracker with
+ * hundreds does not land in one go. Everything after this is the label's
+ * business, as before.
+ */
+export const STARTER_IMPORT = 10;
 
 export const DEFAULTS = {
   apiUrl: "https://api.linear.app/graphql",
