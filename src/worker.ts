@@ -65,6 +65,10 @@ import {
 let currentContext: PluginContext | null = null;
 let currentClient: LinearClient | null = null;
 let currentConfig: LinearPluginConfig | null = null;
+// The company this instance was set up for. A secret is kept per company,
+// and the host resolves one only for a company it is told: an invocation
+// with no company of its own (activation, a config change) names this one.
+let setupCompanyId: string | undefined;
 let cachedImportLabel: LinearLabel | null = null;
 const recentActivity: RecentActivityEntry[] = [];
 
@@ -102,11 +106,23 @@ async function loadConfig(ctx: PluginContext): Promise<LinearPluginConfig> {
   // Config is per company on the host; the plugin names the company it
   // serves (one per instance on a hosted workspace) and starts with the
   // defaults when that company has no config yet.
-  const { config: raw } = await readSetupConfig<LinearPluginConfig>(ctx);
+  const { companyId, config: raw } = await readSetupConfig<LinearPluginConfig>(ctx);
+  if (companyId) setupCompanyId = companyId;
   return {
     ...DEFAULT_CONFIG,
     ...raw,
   };
+}
+
+// secretScope is what a secret ref is resolved under: the company the
+// config names, else the one the plugin was set up for. With neither the
+// host is asked as before, and answers for the invocation's own company.
+function secretScope(
+  config: LinearPluginConfig,
+  configPath: string,
+): { companyId: string; configPath: string } | undefined {
+  const companyId = (config.defaultCompanyId ?? "").trim() || setupCompanyId;
+  return companyId ? { companyId, configPath } : undefined;
 }
 
 async function resolveApiKey(
@@ -115,7 +131,7 @@ async function resolveApiKey(
 ): Promise<string | null> {
   if (config.apiKeyRef) {
     try {
-      return await ctx.secrets.resolve(config.apiKeyRef);
+      return await ctx.secrets.resolve(config.apiKeyRef, secretScope(config, "apiKeyRef"));
     } catch (error) {
       ctx.logger.warn("Failed to resolve apiKeyRef, falling back to apiKey", {
         error: summarizeError(error),
@@ -132,7 +148,7 @@ async function resolveWebhookSecret(
 ): Promise<string | null> {
   if (config.webhookSecretRef) {
     try {
-      return await ctx.secrets.resolve(config.webhookSecretRef);
+      return await ctx.secrets.resolve(config.webhookSecretRef, secretScope(config, "webhookSecretRef"));
     } catch {
       // fall through to raw
     }
