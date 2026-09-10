@@ -28,16 +28,21 @@ log rather than having its issues guessed at.
 
 Two ways in, and both are deliberate:
 
-- **From now on.** The first incremental sync after a workspace connects
-  makes the import label in Linear (`tandem` by default) and records the
-  moment it ran. Issues labelled after that come in on their own,
+- **A handful to start with.** The first incremental sync after a workspace
+  connects makes the import label in Linear (`tandem` by default) and brings
+  in the ten most recently touched issues of the project it works on,
+  labelled or not — because nobody has labelled anything the minute they
+  connect, and a workspace that starts empty looks like it does nothing.
+- **From now on.** That same sync records the moment it ran. Issues labelled after that come in on their own,
   within a minute. Nothing older is swept in because a tracker was
   connected. `incrementalSyncMinutes` raises that interval for an operator
   who would rather ask Linear less often.
 - **What the team already has.** The *Import labelled issues* button on a
-  linked project brings in existing labelled issues, up to
-  `IMPORT_BATCH_DEFAULT` per press (25, `limit` raises it to at most 100).
-  Issues already linked are skipped, so pressing it twice is safe.
+  project brings in existing labelled issues, up to `IMPORT_BATCH_DEFAULT`
+  per press (25, `limit` raises it to at most 100); *Import recent issues*
+  (`labelled: false`) brings in the most recent ones whatever their labels,
+  for a team that has not labelled anything yet. Issues already linked are
+  skipped, so pressing either twice is safe.
 
 ## Capabilities
 
