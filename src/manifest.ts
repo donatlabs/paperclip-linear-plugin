@@ -71,7 +71,11 @@ const manifest: PaperclipPluginManifestV1 = {
           "Paste your Linear personal API key here (Linear → Settings → API → Personal API keys). Stored encrypted at rest. For stronger isolation, use apiKeyRef instead.",
       },
       apiKeyRef: {
-        type: "string",
+        // The host binds a secret as {type:"secret_ref", secretId}; an older
+        // host, and a person typing one in, give the secret's UUID. The SDK
+        // resolves either, so the schema must accept either — or the host
+        // refuses the config a platform writes.
+        type: ["string", "object"],
         title: "Linear API Key (secret ref)",
         description:
           "Optional: reference an entry in the workspace secret store instead of pasting the key above.",
@@ -83,7 +87,11 @@ const manifest: PaperclipPluginManifestV1 = {
         description: "Paste the HMAC SHA-256 signing secret Linear shows when you create the webhook.",
       },
       webhookSecretRef: {
-        type: "string",
+        // The host binds a secret as {type:"secret_ref", secretId}; an older
+        // host, and a person typing one in, give the secret's UUID. The SDK
+        // resolves either, so the schema must accept either — or the host
+        // refuses the config a platform writes.
+        type: ["string", "object"],
         title: "Linear Webhook Signing Secret (secret ref)",
         format: "secret-ref",
       },
