@@ -20,6 +20,12 @@ backlog with nobody assigned; an agent takes it when a person hands it over.
 A tracker with hundreds of labelled issues therefore fills a backlog, not a
 queue of runs.
 
+Where an imported issue lands, in order: the Tandem project its Linear
+project is linked to; the `defaultProjectId` the workspace names in the
+plugin settings; or, when the workspace has exactly one project, that one.
+A workspace with several projects and no default is told so in the activity
+log rather than having its issues guessed at.
+
 Two ways in, and both are deliberate:
 
 - **From now on.** The first incremental sync after a workspace connects
@@ -63,7 +69,7 @@ by `instanceConfigSchema` in [`src/manifest.ts`](./src/manifest.ts):
 | `apiUrl` | string | GraphQL endpoint; defaults to `https://api.linear.app/graphql` |
 | `pushPaperclipIssues` | boolean | Mirror Paperclip issues → Linear |
 | `importLinearIssues` | boolean | Mirror Linear issues → Paperclip |
-| `defaultCompanyId` / `defaultProjectId` | uuid | Where imported issues land |
+| `defaultProjectId` / `defaultCompanyId` | uuid | Where imported issues land when nothing is linked |
 | `companyTeamMap` | object | Map Paperclip company UUID → Linear team UUID |
 | `incrementalSyncMinutes` | int | Polling cadence for incremental sync; 1 by default |
 

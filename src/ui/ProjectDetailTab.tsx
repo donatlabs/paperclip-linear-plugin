@@ -287,14 +287,14 @@ export function LinearProjectDetailTab({ context }: PluginDetailTabProps) {
         </div>
       </section>
 
-      {link ? (
-        <section style={s.card}>
+      <section style={s.card}>
           <strong style={s.heading}>Import issues from Linear</strong>
           <div style={s.subtle}>
             Issues labelled <code>{importLabelName}</code> in Linear come in on
             their own from the moment this workspace connected. Existing ones
-            are brought in here, a batch at a time. They land in the backlog —
-            importing does not start any work.
+            are brought in here, a batch at a time
+            {link?.linearProjectId ? ` from ${link.linearProjectName ?? "the linked Linear project"}` : ""}.
+            They land in the backlog — importing does not start any work.
           </div>
           <div style={s.row}>
             <button
@@ -333,8 +333,7 @@ export function LinearProjectDetailTab({ context }: PluginDetailTabProps) {
             </button>
             {importResult ? <span style={s.subtle}>{importResult}</span> : null}
           </div>
-        </section>
-      ) : null}
+      </section>
 
       {link ? (
         <section style={s.card}>
