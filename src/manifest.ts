@@ -112,6 +112,8 @@ const manifest: PaperclipPluginManifestV1 = {
       incrementalSyncMinutes: {
         type: "integer",
         title: "Incremental Sync Frequency (minutes)",
+        description:
+          "How often labelled Linear issues are pulled in. One minute by default; raise it to ask Linear less often.",
         minimum: 1,
         maximum: 1440,
         default: DEFAULT_CONFIG.incrementalSyncMinutes,
@@ -131,7 +133,11 @@ const manifest: PaperclipPluginManifestV1 = {
       displayName: "Linear: Incremental Sync",
       description:
         "Pull labelled Linear issues updated since the last cursor, per linked project.",
-      schedule: "*/15 * * * *",
+      // Every minute, so a labelled issue reaches the workspace while the
+      // person who labelled it is still looking at it. How often a run
+      // actually asks Linear anything is the operator's, through
+      // incrementalSyncMinutes; the job itself is cheap when nothing is due.
+      schedule: "* * * * *",
     },
   ],
   webhooks: [

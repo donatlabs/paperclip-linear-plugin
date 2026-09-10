@@ -888,6 +888,25 @@ async function runIncrementalSync(_job: PluginJobContext): Promise<void> {
 
   const labelName = config.importLabelName ?? DEFAULT_CONFIG.importLabelName;
 
+  // The job ticks every minute; how often it actually asks Linear anything
+  // is the operator's setting. A run that is not due yet costs one state
+  // read and nothing else.
+  const everyMinutes = Math.max(
+    1,
+    Math.floor(config.incrementalSyncMinutes ?? DEFAULT_CONFIG.incrementalSyncMinutes),
+  );
+  const lastRun = (await ctx.state.get({
+    scopeKind: "instance",
+    namespace: STATE_NAMESPACE,
+    stateKey: STATE_KEYS.lastIncrementalSyncAt,
+  })) as string | null;
+  if (lastRun) {
+    const due = Date.parse(lastRun) + everyMinutes * 60_000;
+    // A minute's worth of slack, since the host's scheduler ticks on its
+    // own clock and a run that lands a second early should still count.
+    if (Number.isFinite(due) && Date.now() < due - 5_000) return;
+  }
+
   // Find every linked Paperclip project and pull labelled Linear issues for each
   // mapped Linear project. ctx.entities listing is a workable proxy for "iterate
   // over all project links" since we upsert one per linked project elsewhere.

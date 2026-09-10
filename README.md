@@ -24,8 +24,9 @@ Two ways in, and both are deliberate:
 
 - **From now on.** The first incremental sync after a workspace connects
   records the moment it ran. Issues labelled after that come in on their own,
-  within one sync cadence. Nothing older is swept in because a tracker was
-  connected.
+  within a minute. Nothing older is swept in because a tracker was
+  connected. `incrementalSyncMinutes` raises that interval for an operator
+  who would rather ask Linear less often.
 - **What the team already has.** The *Import labelled issues* button on a
   linked project brings in existing labelled issues, up to
   `IMPORT_BATCH_DEFAULT` per press (25, `limit` raises it to at most 100).
@@ -64,7 +65,7 @@ by `instanceConfigSchema` in [`src/manifest.ts`](./src/manifest.ts):
 | `importLinearIssues` | boolean | Mirror Linear issues → Paperclip |
 | `defaultCompanyId` / `defaultProjectId` | uuid | Where imported issues land |
 | `companyTeamMap` | object | Map Paperclip company UUID → Linear team UUID |
-| `incrementalSyncMinutes` | int | Polling cadence for incremental sync |
+| `incrementalSyncMinutes` | int | Polling cadence for incremental sync; 1 by default |
 
 The settings page provides a **Test Connection** button that calls Linear's
 `viewer` query to verify the key.
