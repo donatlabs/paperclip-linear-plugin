@@ -49,6 +49,7 @@ export const ACTION_KEYS = {
   linkProject: "link-project",
   unlinkProject: "unlink-project",
   backfillProject: "backfill-project",
+  importProject: "import-project",
   // Issue linking
   linkIssue: "link-issue",
   unlinkIssue: "unlink-issue",
@@ -98,6 +99,14 @@ export const ENTITY_TYPES = {
 } as const;
 
 export const ACTIVITY_BUFFER_MAX = 50;
+
+/**
+ * How many labelled Linear issues one press of "Import labelled issues"
+ * brings in. Importing a team's existing tracker is deliberate and capped:
+ * a workspace fills up a batch at a time, at the pace someone asks for.
+ */
+export const IMPORT_BATCH_DEFAULT = 25;
+export const IMPORT_BATCH_MAX = 100;
 
 export const DEFAULTS = {
   apiUrl: "https://api.linear.app/graphql",

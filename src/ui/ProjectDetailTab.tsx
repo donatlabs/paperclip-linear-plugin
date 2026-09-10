@@ -59,11 +59,13 @@ export function LinearProjectDetailTab({ context }: PluginDetailTabProps) {
   const unlinkProject = usePluginAction(ACTION_KEYS.unlinkProject);
   const refreshLinear = usePluginAction(ACTION_KEYS.refreshLinearProjects);
   const backfill = usePluginAction(ACTION_KEYS.backfillProject);
+  const importIssues = usePluginAction(ACTION_KEYS.importProject);
 
   const [draftTeamId, setDraftTeamId] = useState<string>("");
   const [draftProjectId, setDraftProjectId] = useState<string>("");
   const [busy, setBusy] = useState<string | null>(null);
   const [backfillResult, setBackfillResult] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<string | null>(null);
   const [autoRefreshed, setAutoRefreshed] = useState<boolean>(false);
 
   const link = linkQuery.data?.link ?? null;
@@ -284,6 +286,55 @@ export function LinearProjectDetailTab({ context }: PluginDetailTabProps) {
           </div>
         </div>
       </section>
+
+      {link ? (
+        <section style={s.card}>
+          <strong style={s.heading}>Import issues from Linear</strong>
+          <div style={s.subtle}>
+            Issues labelled <code>{importLabelName}</code> in Linear come in on
+            their own from the moment this workspace connected. Existing ones
+            are brought in here, a batch at a time. They land in the backlog —
+            importing does not start any work.
+          </div>
+          <div style={s.row}>
+            <button
+              type="button"
+              style={s.button}
+              disabled={busy !== null}
+              onClick={async () => {
+                setBusy("import");
+                setImportResult(null);
+                try {
+                  const result = (await importIssues({
+                    paperclipProjectId: projectId,
+                  })) as {
+                    ok: boolean;
+                    imported: number;
+                    skipped: number;
+                    failed: number;
+                  };
+                  setImportResult(
+                    [
+                      `${result.imported} imported`,
+                      `${result.skipped} already linked`,
+                      `${result.failed} failed`,
+                    ].join(", "),
+                  );
+                } catch (error) {
+                  setImportResult(
+                    error instanceof Error ? error.message : String(error),
+                  );
+                } finally {
+                  setBusy(null);
+                }
+              }}
+            >
+              {busy === "import" ? "Importing…" : "Import labelled issues"}
+            </button>
+            {importResult ? <span style={s.subtle}>{importResult}</span> : null}
+          </div>
+        </section>
+      ) : null}
 
       {link ? (
         <section style={s.card}>
