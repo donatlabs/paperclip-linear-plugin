@@ -5,7 +5,7 @@
  */
 
 export const PLUGIN_ID = "paperclip.linear";
-export const PLUGIN_VERSION = "0.6.0";
+export const PLUGIN_VERSION = "0.6.1";
 
 export const PAGE_ROUTE = "linear";
 
