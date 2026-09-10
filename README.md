@@ -29,7 +29,8 @@ log rather than having its issues guessed at.
 Two ways in, and both are deliberate:
 
 - **From now on.** The first incremental sync after a workspace connects
-  records the moment it ran. Issues labelled after that come in on their own,
+  makes the import label in Linear (`tandem` by default) and records the
+  moment it ran. Issues labelled after that come in on their own,
   within a minute. Nothing older is swept in because a tracker was
   connected. `incrementalSyncMinutes` raises that interval for an operator
   who would rather ask Linear less often.

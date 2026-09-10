@@ -72,7 +72,7 @@ export function LinearProjectDetailTab({ context }: PluginDetailTabProps) {
   const teams = linearTeamsQuery.data?.teams ?? [];
   const projects = linearProjectsQuery.data?.projects ?? [];
   const configured = health.data?.configured ?? false;
-  const importLabelName = health.data?.importLabelName ?? "paperclip";
+  const importLabelName = health.data?.importLabelName ?? "tandem";
 
   // Auto-refresh once: as soon as we know the worker is configured AND the
   // local cache is empty, kick off a refresh. Prevents the "empty dropdown"
