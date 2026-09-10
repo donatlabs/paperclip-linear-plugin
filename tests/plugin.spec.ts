@@ -96,6 +96,11 @@ describe("Linear plugin manifest", () => {
     assert.equal(props.importLabelName?.default, "paperclip");
   });
 
+  it("pulls labelled issues every minute", () => {
+    const incremental = (manifest.jobs ?? []).find((j) => j.jobKey === JOB_KEYS.incrementalSync);
+    assert.equal(incremental?.schedule, "* * * * *");
+  });
+
   it("declares full-sync and incremental-sync jobs", () => {
     const keys = (manifest.jobs ?? []).map((j) => j.jobKey);
     assert.deepEqual(keys.sort(), [JOB_KEYS.fullSync, JOB_KEYS.incrementalSync].sort());
@@ -178,6 +183,40 @@ describe("Linear plugin worker (test harness)", () => {
         (await harness.ctx.issues.list({ companyId: COMPANY_ID })).length,
         0,
       );
+    } finally {
+      linear.restore();
+    }
+  });
+
+  it("leaves Linear alone until the configured minute is up", async () => {
+    const linear = fakeLinear([linearIssue("linear-1", "ACME-1", "New work")]);
+    try {
+      const harness = createTestHarness({
+        manifest,
+        capabilities: manifest.capabilities,
+        config: { apiKey: "lin_test", incrementalSyncMinutes: 15 },
+      });
+      await plugin.definition.setup(harness.ctx);
+      const scope = { scopeKind: "instance" as const, namespace: STATE_NAMESPACE };
+      await harness.ctx.state.set(
+        { ...scope, stateKey: STATE_KEYS.syncCursor },
+        "2026-01-01T00:00:00.000Z",
+      );
+      await harness.ctx.state.set(
+        { ...scope, stateKey: STATE_KEYS.lastIncrementalSyncAt },
+        new Date().toISOString(),
+      );
+
+      await harness.runJob(JOB_KEYS.incrementalSync);
+      assert.deepEqual(linear.queries, [], "a run that is not due asks Linear nothing");
+
+      // A quarter of an hour later the same tick does the work.
+      await harness.ctx.state.set(
+        { ...scope, stateKey: STATE_KEYS.lastIncrementalSyncAt },
+        new Date(Date.now() - 16 * 60_000).toISOString(),
+      );
+      await harness.runJob(JOB_KEYS.incrementalSync);
+      assert.equal(linear.queries.length, 1);
     } finally {
       linear.restore();
     }

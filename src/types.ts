@@ -47,7 +47,7 @@ export const DEFAULT_CONFIG: Required<
   apiUrl: "https://api.linear.app/graphql",
   pushPaperclipIssues: true,
   importLinearIssues: true,
-  incrementalSyncMinutes: 15,
+  incrementalSyncMinutes: 1,
   importLabelName: "paperclip",
 };
 
