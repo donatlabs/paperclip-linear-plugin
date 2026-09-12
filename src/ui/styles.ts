@@ -9,10 +9,11 @@
 import type { CSSProperties } from "react";
 
 export const card: CSSProperties = {
-  border: "1px solid rgba(0, 0, 0, 0.1)",
+  border: "1px solid var(--border)",
   borderRadius: 8,
   padding: 16,
-  background: "var(--paperclip-card-bg, #fff)",
+  background: "var(--card)",
+  color: "var(--card-foreground)",
   display: "grid",
   gap: 12,
 };
@@ -24,7 +25,7 @@ export const heading: CSSProperties = {
 };
 
 export const subtle: CSSProperties = {
-  color: "rgba(0, 0, 0, 0.6)",
+  color: "var(--muted-foreground)",
   fontSize: 12,
 };
 
@@ -36,10 +37,11 @@ export const row: CSSProperties = {
 };
 
 export const button: CSSProperties = {
-  border: "1px solid rgba(0, 0, 0, 0.15)",
+  border: "1px solid var(--border)",
   borderRadius: 6,
   padding: "6px 10px",
-  background: "rgba(0, 0, 0, 0.04)",
+  background: "var(--secondary)",
+  color: "var(--foreground)",
   cursor: "pointer",
   fontSize: 13,
 };
@@ -61,15 +63,15 @@ export const pill = (
         ? "rgba(217, 119, 6, 0.15)"
         : tone === "error"
           ? "rgba(220, 38, 38, 0.15)"
-          : "rgba(0, 0, 0, 0.08)",
+          : "var(--muted)",
   color:
     tone === "ok"
-      ? "#1f6f33"
+      ? "#3fb950"
       : tone === "warning"
-        ? "#92400e"
+        ? "#d29922"
         : tone === "error"
-          ? "#991b1b"
-          : "rgba(0, 0, 0, 0.7)",
+          ? "#f85149"
+          : "var(--muted-foreground)",
 });
 
 export const list: CSSProperties = {

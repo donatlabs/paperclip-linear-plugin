@@ -1,6 +1,6 @@
 {
   "name": "@donatlabs/paperclip-plugin-linear",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Paperclip plugin that connects a Paperclip instance to a Linear workspace \u2014 issue sync, comments, status mirroring, webhooks, and an agent tool.",
   "type": "module",
   "license": "MIT",
